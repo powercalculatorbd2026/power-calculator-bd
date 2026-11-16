@@ -1,83 +1,605 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1.0">
-  <title>Power Calculator BD</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Calculator BD</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
+header{background:#123b68;color:white;text-align:center;padding:25px 12px}
+header h1{margin:0 0 8px}
+header p{margin:0;font-size:14px}
+.container{max-width:700px;margin:25px auto;padding:15px}
+.calculator{background:white;padding:22px;border-radius:12px;box-shadow:0 3px 12px #00000012}
+h2{color:#123b68;margin-top:0}
+.field{margin-bottom:16px}
+label{display:block;font-weight:bold;margin-bottom:7px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
+button{width:100%;padding:14px;background:#087f5b;color:white;border:0;border-radius:7px;font-size:16px;font-weight:bold;cursor:pointer}
+button:hover{background:#066747}
+.tabs{display:flex;gap:8px;margin:18px 0}
+.tabs button{font-size:14px;padding:12px 5px;background:#dbeafe;color:#123b68}
+.tabs button.active{background:#087f5b;color:white}
+.result{margin-top:20px;padding:18px;background:#e8f5ee;border-radius:8px;display:none}
+.result h3{margin-top:0;color:#087f5b}
+.answer{font-size:27px;font-weight:bold;color:#087f5b}
+.warning{color:#b45309;font-weight:bold}
+.note{color:#64748b;font-size:13px;line-height:1.6;margin-top:18px}
+footer{text-align:center;padding:20px;color:#64748b;font-size:13px}
+</style>
+</head>
+<body>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #f2f5f8;
-      color: #183044;
+<header>
+<h1>Power Calculator BD</h1>
+<p>UPS • Battery • Solar • Power Solutions</p>
+</header>
+
+<div class="container">
+<div class="calculator">
+
+<h2>UPS Battery Calculator</h2>
+<p>Single Phase UPS | 1–20 kVA</p>
+
+<div class="tabs">
+<button id="timeTab" class="active" onclick="changeMode('time')">Backup Time</button>
+<button id="ahTab" onclick="changeMode('ah')">Required Battery Ah</button>
+</div>
+
+<div class="field">
+<label>UPS Capacity (kVA)</label>
+<input type="number" id="kva" value="3" min="1" max="20" step="0.1">
+</div>
+
+<div class="field">
+<label>UPS Output Power Factor</label>
+<input type="number" id="pf" value="0.8" min="0.1" max="1" step="0.01">
+</div>
+
+<div class="field">
+<label>Actual Load (Watt)</label>
+<input type="number" id="load" value="1500" min="1">
+</div>
+
+<div class="field">
+<label>Battery Type</label>
+<select id="type" onchange="setDefaults()">
+<option value="lead">Lead Acid</option>
+<option value="lithium">Lithium (LFP)</option>
+</select>
+</div>
+
+<div class="field">
+<label>Battery Bank Voltage (VDC)</label>
+<input type="number" id="voltage" value="72" min="1">
+</div>
+
+<div class="field" id="ahField">
+<label>Available Battery String Capacity (Ah)</label>
+<input type="number" id="ah" value="40" min="1">
+</div>
+
+<div class="field">
+<label>Number of Parallel Strings</label>
+<input type="number" id="strings" value="1" min="1" step="1">
+</div>
+
+<div class="field" id="timeField" style="display:none">
+<label>Required Backup Time (Hours)</label>
+<input type="number" id="requiredTime" value="1" min="0.01" step="0.1">
+</div>
+
+<div class="field">
+<label>UPS Efficiency (%)</label>
+<input type="number" id="efficiency" value="90" min="1" max="100">
+</div>
+
+<div class="field">
+<label>Usable Battery Capacity / DoD (%)</label>
+<input type="number" id="dod" value="50" min="1" max="100">
+</div>
+
+<button onclick="calculate()">Calculate Now</button>
+
+<div class="result" id="result">
+<h3>Calculation Result</h3>
+<p id="resultLabel">Estimated Backup Time:</p>
+<div class="answer" id="answer">--</div>
+<p id="detail"></p>
+<p id="status"></p>
+<p class="note">This is an approximate energy-based estimate. Actual battery selection should consider the manufacturer's discharge data, battery age, temperature and UPS cutoff voltage.</p>
+</div>
+
+<p class="note">
+Formula:
+<br>
+Backup Time = (V × Ah × Strings × DoD × Efficiency) ÷ Load
+<br><br>
+Required Ah = (Load × Backup Hours) ÷ (V × DoD × Efficiency)
+<br><br>
+DoD and efficiency are entered as percentages. Follow the battery manufacturer's recommended DoD.
+</p>
+
+</div>
+</div>
+
+<footer>© 2026 Power Calculator BD</footer>
+
+<script>
+let mode = "time";
+
+function changeMode(newMode){
+    mode = newMode;
+
+    document.getElementById("timeTab").classList.toggle("active", mode === "time");
+    document.getElementById("ahTab").classList.toggle("active", mode === "ah");
+
+    document.getElementById("ahField").style.display =
+        mode === "time" ? "block" : "none";
+
+    document.getElementById("timeField").style.display =
+        mode === "ah" ? "block" : "none";
+
+    document.getElementById("result").style.display = "none";
+}
+
+function setDefaults(){
+    const type = document.getElementById("type").value;
+    document.getElementById("dod").value =
+        type === "lead" ? 50 : 80;
+}
+
+function calculate(){
+    const kva = Number(document.getElementById("kva").value);
+    const pf = Number(document.getElementById("pf").value);
+    const load = Number(document.getElementById("load").value);
+    const voltage = Number(document.getElementById("voltage").value);
+    const ah = Number(document.getElementById("ah").value);
+    const strings = Number(document.getElementById("strings").value);
+    const efficiency = Number(document.getElementById("efficiency").value)/100;
+    const dod = Number(document.getElementById("dod").value)/100;
+    const requiredTime = Number(document.getElementById("requiredTime").value);
+
+    if(![kva,pf,load,voltage,strings,efficiency,dod].every(Number.isFinite) ||
+       kva<=0 || pf<=0 || pf>1 || load<=0 || voltage<=0 ||
+       !Number.isInteger(strings) || strings<1 ||
+       efficiency<=0 || efficiency>1 || dod<=0 || dod>1){
+        alert("Please enter valid values.");
+        return;
     }
 
-    header {
-      background: #123b52;
-      color: white;
-      text-align: center;
-      padding: 30px 15px;
+    const ratedWatts = kva * 1000 * pf;
+    const status = document.getElementById("status");
+
+    if(load > ratedWatts){
+        status.innerText = "Warning: Load exceeds UPS rated watt capacity.";
+        status.className = "warning";
+    }else{
+        status.innerText = "Load is within UPS rated watt capacity.";
+        status.className = "";
     }
 
-    main {
-      max-width: 850px;
-      margin: 25px auto;
-      padding: 15px;
+    if(mode === "time"){
+        if(!Number.isFinite(ah) || ah<=0){
+            alert("Enter valid battery Ah.");
+            return;
+        }
+
+        const totalAh = ah * strings;
+        const backupHours = (voltage * totalAh * dod * efficiency)/load;
+        const hours = Math.floor(backupHours);
+        const minutes = Math.round((backupHours-hours)*60);
+
+        document.getElementById("resultLabel").innerText =
+            "Estimated Backup Time:";
+        document.getElementById("answer").innerText =
+            hours + " Hours " + minutes + " Minutes";
+        document.getElementById("detail").innerText =
+            "Total battery bank capacity: " + totalAh + " Ah";
+
+    }else{
+        if(!Number.isFinite(requiredTime) || requiredTime<=0){
+            alert("Enter valid backup time.");
+            return;
+        }
+
+        const totalRequiredAh =
+            (load * requiredTime)/(voltage * dod * efficiency);
+
+        const perStringAh = totalRequiredAh/strings;
+
+        document.getElementById("resultLabel").innerText =
+            "Required Battery Bank Capacity:";
+        document.getElementById("answer").innerText =
+            totalRequiredAh.toFixed(2) + " Ah";
+        document.getElementById("detail").innerText =
+            "Required capacity per parallel string: " +
+            perStringAh.toFixed(2) + " Ah";
     }
 
-    .tool {
-      background: white;
-      padding: 20px;
-      margin-bottom: 15px;
-      border-radius: 12px;
-    }
+    document.getElementById("result").style.display = "block";
+}
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Calculator BD</title>
 
-    .tool h2 {
-      color: #087e8b;
-    }
-
-    footer {
-      text-align: center;
-      padding: 20px;
-    }
-  </style>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
+header{background:#123b68;color:white;text-align:center;padding:25px 12px}
+header h1{margin:0 0 8px}
+header p{margin:0;font-size:14px}
+.container{max-width:720px;margin:25px auto;padding:15px}
+.calculator{background:white;padding:22px;border-radius:12px;box-shadow:0 3px 12px #00000012}
+h2{color:#123b68;margin-top:0}
+.field{margin-bottom:16px}
+label{display:block;font-weight:bold;margin-bottom:7px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
+button{width:100%;padding:13px;background:#087f5b;color:white;border:0;border-radius:7px;font-size:16px;font-weight:bold;cursor:pointer}
+.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:18px 0}
+.tabs button{font-size:13px;padding:12px 5px;background:#dbeafe;color:#123b68}
+.tabs button.active{background:#087f5b;color:white}
+.result{margin-top:20px;padding:18px;background:#e8f5ee;border-radius:8px;display:none}
+.result h3{margin-top:0;color:#087f5b}
+.answer{font-size:26px;font-weight:bold;color:#087f5b}
+.warning{color:#b45309;font-weight:bold}
+.note{color:#64748b;font-size:13px;line-height:1.6;margin-top:18px}
+footer{text-align:center;padding:20px;color:#64748b;font-size:13px}
+.section{display:none}
+.section.active{display:block}
+</style>
 </head>
 
 <body>
 
 <header>
-  <h1>Power Calculator BD</h1>
-  <p>Power & Energy Calculation Solutions</p>
-  <p>বিদ্যুৎ ও এনার্জি হিসাবের সহজ সমাধান</p>
+<h1>Power Calculator BD</h1>
+<p>UPS • Battery • Solar • Power Solutions</p>
 </header>
 
-<main>
+<div class="container">
+<div class="calculator">
 
-  <div class="tool">
-    <h2>UPS Battery Calculator</h2>
-    <p>Calculate UPS battery backup time.</p>
-    <p>UPS ব্যাটারির ব্যাকআপ সময় হিসাব করুন।</p>
-  </div>
+<h2>UPS & Battery Calculator</h2>
+<p>Professional Battery Sizing Tools</p>
 
-  <div class="tool">
-    <h2>Solar Calculator</h2>
-    <p>Calculate solar panel requirements.</p>
-    <p>সোলার প্যানেলের প্রয়োজনীয়তা হিসাব করুন।</p>
-  </div>
+<div class="tabs">
+<button id="tab1" class="active" onclick="showSection(1)">Backup Time</button>
+<button id="tab2" onclick="showSection(2)">Required Ah</button>
+<button id="tab3" onclick="showSection(3)">Battery Bank</button>
+</div>
 
-  <div class="tool">
-    <h2>VAT Calculator</h2>
-    <p>Calculate VAT and Tax.</p>
-    <p>ভ্যাট ও ট্যাক্স হিসাব করুন।</p>
-  </div>
+<!-- CALCULATOR 1 -->
 
-</main>
+<div id="section1" class="section active">
+
+<h3>UPS Backup Time Calculator</h3>
+
+<div class="field">
+<label>UPS Capacity (kVA)</label>
+<input type="number" id="kva1" value="3" min="0.1" max="20" step="0.1">
+</div>
+
+<div class="field">
+<label>UPS Output Power Factor</label>
+<input type="number" id="pf1" value="0.8" min="0.1" max="1" step="0.01">
+</div>
+
+<div class="field">
+<label>Actual Load (Watt)</label>
+<input type="number" id="load1" value="1500" min="1">
+</div>
+
+<div class="field">
+<label>Battery Type</label>
+<select id="type1" onchange="setDoD(1)">
+<option value="lead">Lead Acid</option>
+<option value="lithium">Lithium LFP</option>
+</select>
+</div>
+
+<div class="field">
+<label>Battery Bank Voltage (VDC)</label>
+<input type="number" id="voltage1" value="72" min="1">
+</div>
+
+<div class="field">
+<label>Battery String Capacity (Ah)</label>
+<input type="number" id="ah1" value="40" min="1">
+</div>
+
+<div class="field">
+<label>Parallel Strings</label>
+<input type="number" id="strings1" value="1" min="1" step="1">
+</div>
+
+<div class="field">
+<label>UPS Efficiency (%)</label>
+<input type="number" id="eff1" value="90" min="1" max="100">
+</div>
+
+<div class="field">
+<label>Battery DoD (%)</label>
+<input type="number" id="dod1" value="50" min="1" max="100">
+</div>
+
+<button onclick="backupCalculation()">Calculate Backup Time</button>
+
+<div class="result" id="result1">
+<h3>Calculation Result</h3>
+<p>Estimated Backup Time:</p>
+<div class="answer" id="backupAnswer"></div>
+<p id="backupDetails"></p>
+<p id="backupStatus"></p>
+</div>
+
+</div>
+
+<!-- CALCULATOR 2 -->
+
+<div id="section2" class="section">
+
+<h3>Required Battery Ah Calculator</h3>
+
+<div class="field">
+<label>UPS Capacity (kVA)</label>
+<input type="number" id="kva2" value="3" min="0.1" max="20" step="0.1">
+</div>
+
+<div class="field">
+<label>UPS Output Power Factor</label>
+<input type="number" id="pf2" value="0.8" min="0.1" max="1" step="0.01">
+</div>
+
+<div class="field">
+<label>Actual Load (Watt)</label>
+<input type="number" id="load2" value="1500" min="1">
+</div>
+
+<div class="field">
+<label>Required Backup Time (Hours)</label>
+<input type="number" id="time2" value="1" min="0.01" step="0.1">
+</div>
+
+<div class="field">
+<label>Battery Type</label>
+<select id="type2" onchange="setDoD(2)">
+<option value="lead">Lead Acid</option>
+<option value="lithium">Lithium LFP</option>
+</select>
+</div>
+
+<div class="field">
+<label>Battery Bank Voltage (VDC)</label>
+<input type="number" id="voltage2" value="72" min="1">
+</div>
+
+<div class="field">
+<label>UPS Efficiency (%)</label>
+<input type="number" id="eff2" value="90" min="1" max="100">
+</div>
+
+<div class="field">
+<label>Battery DoD (%)</label>
+<input type="number" id="dod2" value="50" min="1" max="100">
+</div>
+
+<div class="field">
+<label>Parallel Strings</label>
+<input type="number" id="strings2" value="1" min="1" step="1">
+</div>
+
+<button onclick="requiredAhCalculation()">Calculate Required Ah</button>
+
+<div class="result" id="result2">
+<h3>Required Battery Result</h3>
+<p>Total Required Bank Capacity:</p>
+<div class="answer" id="requiredAnswer"></div>
+<p id="requiredDetails"></p>
+<p id="requiredStatus"></p>
+</div>
+
+</div>
+
+<!-- CALCULATOR 3 -->
+
+<div id="section3" class="section">
+
+<h3>Battery Configuration Calculator</h3>
+
+<div class="field">
+<label>Individual Battery Voltage (V)</label>
+<input type="number" id="batteryV" value="12" min="1">
+</div>
+
+<div class="field">
+<label>Individual Battery Capacity (Ah)</label>
+<input type="number" id="batteryAh" value="200" min="1">
+</div>
+
+<div class="field">
+<label>Number of Batteries in Series</label>
+<input type="number" id="series" value="6" min="1" step="1">
+</div>
+
+<div class="field">
+<label>Number of Parallel Strings</label>
+<input type="number" id="parallel" value="2" min="1" step="1">
+</div>
+
+<button onclick="calculateBank()">Calculate Battery Bank</button>
+
+<div class="result" id="result3">
+<h3>Battery Bank Result</h3>
+<div class="answer" id="bankBattery"></div>
+<p id="bankVoltage"></p>
+<p id="bankAh"></p>
+<p id="bankEnergy"></p>
+</div>
+
+</div>
+
+<p class="note">
+Important: All results are approximate estimates. Actual backup depends on battery discharge rate, temperature, battery age, UPS efficiency and low-voltage cutoff. Always check the manufacturer's battery discharge data and recommended DoD.
+</p>
+
+</div>
+</div>
 
 <footer>
-  © 2026 Power Calculator BD
+© 2026 Power Calculator BD | All Rights Reserved
 </footer>
+
+<script>
+
+function showSection(n){
+    for(let i=1;i<=3;i++){
+        document.getElementById("section"+i).classList.toggle("active",i===n);
+        document.getElementById("tab"+i).classList.toggle("active",i===n);
+    }
+}
+
+function setDoD(n){
+    const type=document.getElementById("type"+n).value;
+    document.getElementById("dod"+n).value=type==="lead"?50:80;
+}
+
+function validBasic(kva,pf,load,voltage,eff,dod){
+    return [kva,pf,load,voltage,eff,dod].every(Number.isFinite) &&
+    kva>0 && kva<=20 && pf>0 && pf<=1 &&
+    load>0 && voltage>0 && eff>0 && eff<=100 &&
+    dod>0 && dod<=100;
+}
+
+function backupCalculation(){
+
+    const kva=Number(document.getElementById("kva1").value);
+    const pf=Number(document.getElementById("pf1").value);
+    const load=Number(document.getElementById("load1").value);
+    const voltage=Number(document.getElementById("voltage1").value);
+    const ah=Number(document.getElementById("ah1").value);
+    const strings=Number(document.getElementById("strings1").value);
+    const eff=Number(document.getElementById("eff1").value);
+    const dod=Number(document.getElementById("dod1").value);
+
+    if(!validBasic(kva,pf,load,voltage,eff,dod) ||
+       !Number.isFinite(ah) || ah<=0 ||
+       !Number.isInteger(strings) || strings<1){
+        alert("Please enter valid values.");
+        return;
+    }
+
+    const ratedWatts=kva*1000*pf;
+    const totalAh=ah*strings;
+    const usableEnergy=voltage*totalAh*(dod/100)*(eff/100);
+    const backupHours=usableEnergy/load;
+
+    showTimeResult(backupHours);
+
+    document.getElementById("backupDetails").innerText=
+    "Total Battery Bank: "+totalAh+" Ah | Usable Energy: "+
+    usableEnergy.toFixed(0)+" Wh";
+
+    document.getElementById("backupStatus").innerText=
+    load>ratedWatts?
+    "Warning: Load exceeds UPS rated watt capacity.":
+    "Load is within UPS rated watt capacity.";
+
+    document.getElementById("backupStatus").className=
+    load>ratedWatts?"warning":"";
+
+    document.getElementById("result1").style.display="block";
+}
+
+function showTimeResult(hours){
+    const h=Math.floor(hours);
+    const m=Math.round((hours-h)*60);
+    document.getElementById("backupAnswer").innerText=
+    h+" Hours "+m+" Minutes";
+}
+
+function requiredAhCalculation(){
+
+    const kva=Number(document.getElementById("kva2").value);
+    const pf=Number(document.getElementById("pf2").value);
+    const load=Number(document.getElementById("load2").value);
+    const time=Number(document.getElementById("time2").value);
+    const voltage=Number(document.getElementById("voltage2").value);
+    const eff=Number(document.getElementById("eff2").value);
+    const dod=Number(document.getElementById("dod2").value);
+    const strings=Number(document.getElementById("strings2").value);
+
+    if(!validBasic(kva,pf,load,voltage,eff,dod) ||
+       !Number.isFinite(time) || time<=0 ||
+       !Number.isInteger(strings) || strings<1){
+        alert("Please enter valid values.");
+        return;
+    }
+
+    const ratedWatts=kva*1000*pf;
+    const totalAh=(load*time)/(voltage*(eff/100)*(dod/100));
+    const perString=totalAh/strings;
+
+    document.getElementById("requiredAnswer").innerText=
+    totalAh.toFixed(2)+" Ah";
+
+    document.getElementById("requiredDetails").innerText=
+    "Required capacity per parallel string: "+
+    perString.toFixed(2)+" Ah";
+
+    document.getElementById("requiredStatus").innerText=
+    load>ratedWatts?
+    "Warning: Load exceeds UPS rated watt capacity.":
+    "Load is within UPS rated watt capacity.";
+
+    document.getElementById("requiredStatus").className=
+    load>ratedWatts?"warning":"";
+
+    document.getElementById("result2").style.display="block";
+}
+
+function calculateBank(){
+
+    const batteryV=Number(document.getElementById("batteryV").value);
+    const batteryAh=Number(document.getElementById("batteryAh").value);
+    const series=Number(document.getElementById("series").value);
+    const parallel=Number(document.getElementById("parallel").value);
+
+    if(![batteryV,batteryAh,series,parallel].every(Number.isFinite) ||
+       batteryV<=0 || batteryAh<=0 ||
+       !Number.isInteger(series) || !Number.isInteger(parallel) ||
+       series<1 || parallel<1){
+        alert("Please enter valid battery values.");
+        return;
+    }
+
+    const totalBattery=series*parallel;
+    const totalVoltage=batteryV*series;
+    const totalAh=batteryAh*parallel;
+    const totalKwh=(totalVoltage*totalAh)/1000;
+
+    document.getElementById("bankBattery").innerText=
+    totalBattery+" Batteries";
+
+    document.getElementById("bankVoltage").innerText=
+    "Total Battery Bank Voltage: "+totalVoltage+" VDC";
+
+    document.getElementById("bankAh").innerText=
+    "Total Battery Bank Capacity: "+totalAh+" Ah";
+
+    document.getElementById("bankEnergy").innerText=
+    "Nominal Battery Energy: "+totalKwh.toFixed(2)+" kWh";
+
+    document.getElementById("result3").style.display="block";
+}
+
+</script>
 
 </body>
 </html>
