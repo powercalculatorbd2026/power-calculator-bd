@@ -1,605 +1,916 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Power Calculator BD</title>
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
-header{background:#123b68;color:white;text-align:center;padding:25px 12px}
-header h1{margin:0 0 8px}
-header p{margin:0;font-size:14px}
-.container{max-width:700px;margin:25px auto;padding:15px}
-.calculator{background:white;padding:22px;border-radius:12px;box-shadow:0 3px 12px #00000012}
-h2{color:#123b68;margin-top:0}
-.field{margin-bottom:16px}
-label{display:block;font-weight:bold;margin-bottom:7px}
-input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
-button{width:100%;padding:14px;background:#087f5b;color:white;border:0;border-radius:7px;font-size:16px;font-weight:bold;cursor:pointer}
-button:hover{background:#066747}
-.tabs{display:flex;gap:8px;margin:18px 0}
-.tabs button{font-size:14px;padding:12px 5px;background:#dbeafe;color:#123b68}
-.tabs button.active{background:#087f5b;color:white}
-.result{margin-top:20px;padding:18px;background:#e8f5ee;border-radius:8px;display:none}
-.result h3{margin-top:0;color:#087f5b}
-.answer{font-size:27px;font-weight:bold;color:#087f5b}
-.warning{color:#b45309;font-weight:bold}
-.note{color:#64748b;font-size:13px;line-height:1.6;margin-top:18px}
-footer{text-align:center;padding:20px;color:#64748b;font-size:13px}
-</style>
-</head>
-<body>
-
-<header>
-<h1>Power Calculator BD</h1>
-<p>UPS • Battery • Solar • Power Solutions</p>
-</header>
-
-<div class="container">
-<div class="calculator">
-
-<h2>UPS Battery Calculator</h2>
-<p>Single Phase UPS | 1–20 kVA</p>
-
-<div class="tabs">
-<button id="timeTab" class="active" onclick="changeMode('time')">Backup Time</button>
-<button id="ahTab" onclick="changeMode('ah')">Required Battery Ah</button>
-</div>
-
-<div class="field">
-<label>UPS Capacity (kVA)</label>
-<input type="number" id="kva" value="3" min="1" max="20" step="0.1">
-</div>
-
-<div class="field">
-<label>UPS Output Power Factor</label>
-<input type="number" id="pf" value="0.8" min="0.1" max="1" step="0.01">
-</div>
-
-<div class="field">
-<label>Actual Load (Watt)</label>
-<input type="number" id="load" value="1500" min="1">
-</div>
-
-<div class="field">
-<label>Battery Type</label>
-<select id="type" onchange="setDefaults()">
-<option value="lead">Lead Acid</option>
-<option value="lithium">Lithium (LFP)</option>
-</select>
-</div>
-
-<div class="field">
-<label>Battery Bank Voltage (VDC)</label>
-<input type="number" id="voltage" value="72" min="1">
-</div>
-
-<div class="field" id="ahField">
-<label>Available Battery String Capacity (Ah)</label>
-<input type="number" id="ah" value="40" min="1">
-</div>
-
-<div class="field">
-<label>Number of Parallel Strings</label>
-<input type="number" id="strings" value="1" min="1" step="1">
-</div>
-
-<div class="field" id="timeField" style="display:none">
-<label>Required Backup Time (Hours)</label>
-<input type="number" id="requiredTime" value="1" min="0.01" step="0.1">
-</div>
-
-<div class="field">
-<label>UPS Efficiency (%)</label>
-<input type="number" id="efficiency" value="90" min="1" max="100">
-</div>
-
-<div class="field">
-<label>Usable Battery Capacity / DoD (%)</label>
-<input type="number" id="dod" value="50" min="1" max="100">
-</div>
-
-<button onclick="calculate()">Calculate Now</button>
-
-<div class="result" id="result">
-<h3>Calculation Result</h3>
-<p id="resultLabel">Estimated Backup Time:</p>
-<div class="answer" id="answer">--</div>
-<p id="detail"></p>
-<p id="status"></p>
-<p class="note">This is an approximate energy-based estimate. Actual battery selection should consider the manufacturer's discharge data, battery age, temperature and UPS cutoff voltage.</p>
-</div>
-
-<p class="note">
-Formula:
-<br>
-Backup Time = (V × Ah × Strings × DoD × Efficiency) ÷ Load
-<br><br>
-Required Ah = (Load × Backup Hours) ÷ (V × DoD × Efficiency)
-<br><br>
-DoD and efficiency are entered as percentages. Follow the battery manufacturer's recommended DoD.
-</p>
-
-</div>
-</div>
-
-<footer>© 2026 Power Calculator BD</footer>
-
-<script>
-let mode = "time";
-
-function changeMode(newMode){
-    mode = newMode;
-
-    document.getElementById("timeTab").classList.toggle("active", mode === "time");
-    document.getElementById("ahTab").classList.toggle("active", mode === "ah");
-
-    document.getElementById("ahField").style.display =
-        mode === "time" ? "block" : "none";
-
-    document.getElementById("timeField").style.display =
-        mode === "ah" ? "block" : "none";
-
-    document.getElementById("result").style.display = "none";
-}
-
-function setDefaults(){
-    const type = document.getElementById("type").value;
-    document.getElementById("dod").value =
-        type === "lead" ? 50 : 80;
-}
-
-function calculate(){
-    const kva = Number(document.getElementById("kva").value);
-    const pf = Number(document.getElementById("pf").value);
-    const load = Number(document.getElementById("load").value);
-    const voltage = Number(document.getElementById("voltage").value);
-    const ah = Number(document.getElementById("ah").value);
-    const strings = Number(document.getElementById("strings").value);
-    const efficiency = Number(document.getElementById("efficiency").value)/100;
-    const dod = Number(document.getElementById("dod").value)/100;
-    const requiredTime = Number(document.getElementById("requiredTime").value);
-
-    if(![kva,pf,load,voltage,strings,efficiency,dod].every(Number.isFinite) ||
-       kva<=0 || pf<=0 || pf>1 || load<=0 || voltage<=0 ||
-       !Number.isInteger(strings) || strings<1 ||
-       efficiency<=0 || efficiency>1 || dod<=0 || dod>1){
-        alert("Please enter valid values.");
-        return;
-    }
-
-    const ratedWatts = kva * 1000 * pf;
-    const status = document.getElementById("status");
-
-    if(load > ratedWatts){
-        status.innerText = "Warning: Load exceeds UPS rated watt capacity.";
-        status.className = "warning";
-    }else{
-        status.innerText = "Load is within UPS rated watt capacity.";
-        status.className = "";
-    }
-
-    if(mode === "time"){
-        if(!Number.isFinite(ah) || ah<=0){
-            alert("Enter valid battery Ah.");
-            return;
-        }
-
-        const totalAh = ah * strings;
-        const backupHours = (voltage * totalAh * dod * efficiency)/load;
-        const hours = Math.floor(backupHours);
-        const minutes = Math.round((backupHours-hours)*60);
-
-        document.getElementById("resultLabel").innerText =
-            "Estimated Backup Time:";
-        document.getElementById("answer").innerText =
-            hours + " Hours " + minutes + " Minutes";
-        document.getElementById("detail").innerText =
-            "Total battery bank capacity: " + totalAh + " Ah";
-
-    }else{
-        if(!Number.isFinite(requiredTime) || requiredTime<=0){
-            alert("Enter valid backup time.");
-            return;
-        }
-
-        const totalRequiredAh =
-            (load * requiredTime)/(voltage * dod * efficiency);
-
-        const perStringAh = totalRequiredAh/strings;
-
-        document.getElementById("resultLabel").innerText =
-            "Required Battery Bank Capacity:";
-        document.getElementById("answer").innerText =
-            totalRequiredAh.toFixed(2) + " Ah";
-        document.getElementById("detail").innerText =
-            "Required capacity per parallel string: " +
-            perStringAh.toFixed(2) + " Ah";
-    }
-
-    document.getElementById("result").style.display = "block";
-}
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Power Calculator BD</title>
-
-<style>
-*{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#1e293b}
-header{background:#123b68;color:white;text-align:center;padding:25px 12px}
-header h1{margin:0 0 8px}
-header p{margin:0;font-size:14px}
-.container{max-width:720px;margin:25px auto;padding:15px}
-.calculator{background:white;padding:22px;border-radius:12px;box-shadow:0 3px 12px #00000012}
-h2{color:#123b68;margin-top:0}
-.field{margin-bottom:16px}
-label{display:block;font-weight:bold;margin-bottom:7px}
-input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;background:white}
-button{width:100%;padding:13px;background:#087f5b;color:white;border:0;border-radius:7px;font-size:16px;font-weight:bold;cursor:pointer}
-.tabs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:18px 0}
-.tabs button{font-size:13px;padding:12px 5px;background:#dbeafe;color:#123b68}
-.tabs button.active{background:#087f5b;color:white}
-.result{margin-top:20px;padding:18px;background:#e8f5ee;border-radius:8px;display:none}
-.result h3{margin-top:0;color:#087f5b}
-.answer{font-size:26px;font-weight:bold;color:#087f5b}
-.warning{color:#b45309;font-weight:bold}
-.note{color:#64748b;font-size:13px;line-height:1.6;margin-top:18px}
-footer{text-align:center;padding:20px;color:#64748b;font-size:13px}
-.section{display:none}
-.section.active{display:block}
-</style>
-</head>
-
-<body>
-
-<header>
-<h1>Power Calculator BD</h1>
-<p>UPS • Battery • Solar • Power Solutions</p>
-</header>
-
-<div class="container">
-<div class="calculator">
-
-<h2>UPS & Battery Calculator</h2>
-<p>Professional Battery Sizing Tools</p>
-
-<div class="tabs">
-<button id="tab1" class="active" onclick="showSection(1)">Backup Time</button>
-<button id="tab2" onclick="showSection(2)">Required Ah</button>
-<button id="tab3" onclick="showSection(3)">Battery Bank</button>
-</div>
-
-<!-- CALCULATOR 1 -->
-
-<div id="section1" class="section active">
-
-<h3>UPS Backup Time Calculator</h3>
-
-<div class="field">
-<label>UPS Capacity (kVA)</label>
-<input type="number" id="kva1" value="3" min="0.1" max="20" step="0.1">
-</div>
-
-<div class="field">
-<label>UPS Output Power Factor</label>
-<input type="number" id="pf1" value="0.8" min="0.1" max="1" step="0.01">
-</div>
-
-<div class="field">
-<label>Actual Load (Watt)</label>
-<input type="number" id="load1" value="1500" min="1">
-</div>
-
-<div class="field">
-<label>Battery Type</label>
-<select id="type1" onchange="setDoD(1)">
-<option value="lead">Lead Acid</option>
-<option value="lithium">Lithium LFP</option>
-</select>
-</div>
-
-<div class="field">
-<label>Battery Bank Voltage (VDC)</label>
-<input type="number" id="voltage1" value="72" min="1">
-</div>
-
-<div class="field">
-<label>Battery String Capacity (Ah)</label>
-<input type="number" id="ah1" value="40" min="1">
-</div>
-
-<div class="field">
-<label>Parallel Strings</label>
-<input type="number" id="strings1" value="1" min="1" step="1">
-</div>
-
-<div class="field">
-<label>UPS Efficiency (%)</label>
-<input type="number" id="eff1" value="90" min="1" max="100">
-</div>
-
-<div class="field">
-<label>Battery DoD (%)</label>
-<input type="number" id="dod1" value="50" min="1" max="100">
-</div>
-
-<button onclick="backupCalculation()">Calculate Backup Time</button>
-
-<div class="result" id="result1">
-<h3>Calculation Result</h3>
-<p>Estimated Backup Time:</p>
-<div class="answer" id="backupAnswer"></div>
-<p id="backupDetails"></p>
-<p id="backupStatus"></p>
-</div>
-
-</div>
-
-<!-- CALCULATOR 2 -->
-
-<div id="section2" class="section">
-
-<h3>Required Battery Ah Calculator</h3>
-
-<div class="field">
-<label>UPS Capacity (kVA)</label>
-<input type="number" id="kva2" value="3" min="0.1" max="20" step="0.1">
-</div>
-
-<div class="field">
-<label>UPS Output Power Factor</label>
-<input type="number" id="pf2" value="0.8" min="0.1" max="1" step="0.01">
-</div>
-
-<div class="field">
-<label>Actual Load (Watt)</label>
-<input type="number" id="load2" value="1500" min="1">
-</div>
-
-<div class="field">
-<label>Required Backup Time (Hours)</label>
-<input type="number" id="time2" value="1" min="0.01" step="0.1">
-</div>
-
-<div class="field">
-<label>Battery Type</label>
-<select id="type2" onchange="setDoD(2)">
-<option value="lead">Lead Acid</option>
-<option value="lithium">Lithium LFP</option>
-</select>
-</div>
-
-<div class="field">
-<label>Battery Bank Voltage (VDC)</label>
-<input type="number" id="voltage2" value="72" min="1">
-</div>
-
-<div class="field">
-<label>UPS Efficiency (%)</label>
-<input type="number" id="eff2" value="90" min="1" max="100">
-</div>
-
-<div class="field">
-<label>Battery DoD (%)</label>
-<input type="number" id="dod2" value="50" min="1" max="100">
-</div>
-
-<div class="field">
-<label>Parallel Strings</label>
-<input type="number" id="strings2" value="1" min="1" step="1">
-</div>
-
-<button onclick="requiredAhCalculation()">Calculate Required Ah</button>
-
-<div class="result" id="result2">
-<h3>Required Battery Result</h3>
-<p>Total Required Bank Capacity:</p>
-<div class="answer" id="requiredAnswer"></div>
-<p id="requiredDetails"></p>
-<p id="requiredStatus"></p>
-</div>
-
-</div>
-
-<!-- CALCULATOR 3 -->
-
-<div id="section3" class="section">
-
-<h3>Battery Configuration Calculator</h3>
-
-<div class="field">
-<label>Individual Battery Voltage (V)</label>
-<input type="number" id="batteryV" value="12" min="1">
-</div>
-
-<div class="field">
-<label>Individual Battery Capacity (Ah)</label>
-<input type="number" id="batteryAh" value="200" min="1">
-</div>
-
-<div class="field">
-<label>Number of Batteries in Series</label>
-<input type="number" id="series" value="6" min="1" step="1">
-</div>
-
-<div class="field">
-<label>Number of Parallel Strings</label>
-<input type="number" id="parallel" value="2" min="1" step="1">
-</div>
-
-<button onclick="calculateBank()">Calculate Battery Bank</button>
-
-<div class="result" id="result3">
-<h3>Battery Bank Result</h3>
-<div class="answer" id="bankBattery"></div>
-<p id="bankVoltage"></p>
-<p id="bankAh"></p>
-<p id="bankEnergy"></p>
-</div>
-
-</div>
-
-<p class="note">
-Important: All results are approximate estimates. Actual backup depends on battery discharge rate, temperature, battery age, UPS efficiency and low-voltage cutoff. Always check the manufacturer's battery discharge data and recommended DoD.
-</p>
-
-</div>
-</div>
-
-<footer>
-© 2026 Power Calculator BD | All Rights Reserved
-</footer>
-
-<script>
-
 function showSection(n){
-    for(let i=1;i<=3;i++){
-        document.getElementById("section"+i).classList.toggle("active",i===n);
-        document.getElementById("tab"+i).classList.toggle("active",i===n);
-    }
+ for(let i=1;i<=4;i++){
+  document.getElementById('section'+i).classList.toggle('active',i===n);
+  document.getElementById('tab'+i).classList.toggle('active',i===n);
+ }
 }
 
 function setDoD(n){
-    const type=document.getElementById("type"+n).value;
-    document.getElementById("dod"+n).value=type==="lead"?50:80;
+ document.getElementById('dod'+n).value=
+ document.getElementById('type'+n).value==='lead'?50:80;
 }
 
-function validBasic(kva,pf,load,voltage,eff,dod){
-    return [kva,pf,load,voltage,eff,dod].every(Number.isFinite) &&
-    kva>0 && kva<=20 && pf>0 && pf<=1 &&
-    load>0 && voltage>0 && eff>0 && eff<=100 &&
-    dod>0 && dod<=100;
+function validBasic(k,p,l,v,e,d){
+ return [k,p,l,v,e,d].every(Number.isFinite)&&
+ k>0&&p>0&&p<=1&&l>0&&v>0&&e>0&&e<=100&&d>0&&d<=100;
+}
+
+function timeText(h){
+ let mins=Math.round(h*60);
+ return Math.floor(mins/60)+' Hours '+(mins%60)+' Minutes';
 }
 
 function backupCalculation(){
+ let k=+document.getElementById('kva1').value;
+ let p=+document.getElementById('pf1').value;
+ let l=+document.getElementById('load1').value;
+ let v=+document.getElementById('voltage1').value;
+ let a=+document.getElementById('ah1').value;
+ let s=+document.getElementById('strings1').value;
+ let e=+document.getElementById('eff1').value;
+ let d=+document.getElementById('dod1').value;
 
-    const kva=Number(document.getElementById("kva1").value);
-    const pf=Number(document.getElementById("pf1").value);
-    const load=Number(document.getElementById("load1").value);
-    const voltage=Number(document.getElementById("voltage1").value);
-    const ah=Number(document.getElementById("ah1").value);
-    const strings=Number(document.getElementById("strings1").value);
-    const eff=Number(document.getElementById("eff1").value);
-    const dod=Number(document.getElementById("dod1").value);
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(a)||a<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
 
-    if(!validBasic(kva,pf,load,voltage,eff,dod) ||
-       !Number.isFinite(ah) || ah<=0 ||
-       !Number.isInteger(strings) || strings<1){
-        alert("Please enter valid values.");
-        return;
-    }
+ let rated=k*1000*p;
+ let bankAh=a*s;
+ let usable=v*bankAh*d/100*e/100;
+ let h=usable/l;
 
-    const ratedWatts=kva*1000*pf;
-    const totalAh=ah*strings;
-    const usableEnergy=voltage*totalAh*(dod/100)*(eff/100);
-    const backupHours=usableEnergy/load;
+ document.getElementById('backupAnswer').textContent=timeText(h);
+ document.getElementById('backupDetails').textContent=
+ 'Phase: '+document.getElementById('phase1').value+
+ ' | Total Battery Bank: '+bankAh.toFixed(2)+
+ ' Ah | Usable Energy: '+usable.toFixed(0)+' Wh';
 
-    showTimeResult(backupHours);
+ document.getElementById('backupStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
 
-    document.getElementById("backupDetails").innerText=
-    "Total Battery Bank: "+totalAh+" Ah | Usable Energy: "+
-    usableEnergy.toFixed(0)+" Wh";
+ document.getElementById('backupStatus').className=
+ l>rated?'warning':'';
 
-    document.getElementById("backupStatus").innerText=
-    load>ratedWatts?
-    "Warning: Load exceeds UPS rated watt capacity.":
-    "Load is within UPS rated watt capacity.";
-
-    document.getElementById("backupStatus").className=
-    load>ratedWatts?"warning":"";
-
-    document.getElementById("result1").style.display="block";
-}
-
-function showTimeResult(hours){
-    const h=Math.floor(hours);
-    const m=Math.round((hours-h)*60);
-    document.getElementById("backupAnswer").innerText=
-    h+" Hours "+m+" Minutes";
+ document.getElementById('result1').style.display='block';
 }
 
 function requiredAhCalculation(){
+ let k=+document.getElementById('kva2').value;
+ let p=+document.getElementById('pf2').value;
+ let l=+document.getElementById('load2').value;
+ let t=+document.getElementById('time2').value;
+ let v=+document.getElementById('voltage2').value;
+ let e=+document.getElementById('eff2').value;
+ let d=+document.getElementById('dod2').value;
+ let s=+document.getElementById('strings2').value;
 
-    const kva=Number(document.getElementById("kva2").value);
-    const pf=Number(document.getElementById("pf2").value);
-    const load=Number(document.getElementById("load2").value);
-    const time=Number(document.getElementById("time2").value);
-    const voltage=Number(document.getElementById("voltage2").value);
-    const eff=Number(document.getElementById("eff2").value);
-    const dod=Number(document.getElementById("dod2").value);
-    const strings=Number(document.getElementById("strings2").value);
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(t)||t<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
 
-    if(!validBasic(kva,pf,load,voltage,eff,dod) ||
-       !Number.isFinite(time) || time<=0 ||
-       !Number.isInteger(strings) || strings<1){
-        alert("Please enter valid values.");
-        return;
-    }
+ let rated=k*1000*p;
+ let bank=(l*t)/(v*e/100*d/100);
 
-    const ratedWatts=kva*1000*pf;
-    const totalAh=(load*time)/(voltage*(eff/100)*(dod/100));
-    const perString=totalAh/strings;
+ document.getElementById('requiredAnswer').textContent=
+ bank.toFixed(2)+' Ah';
 
-    document.getElementById("requiredAnswer").innerText=
-    totalAh.toFixed(2)+" Ah";
+ document.getElementById('requiredDetails').textContent=
+ 'Phase: '+document.getElementById('phase2').value+
+ ' | Required capacity per parallel string: '+
+ (bank/s).toFixed(2)+' Ah';
 
-    document.getElementById("requiredDetails").innerText=
-    "Required capacity per parallel string: "+
-    perString.toFixed(2)+" Ah";
+ document.getElementById('requiredStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
 
-    document.getElementById("requiredStatus").innerText=
-    load>ratedWatts?
-    "Warning: Load exceeds UPS rated watt capacity.":
-    "Load is within UPS rated watt capacity.";
+ document.getElementById('requiredStatus').className=
+ l>rated?'warning':'';
 
-    document.getElementById("requiredStatus").className=
-    load>ratedWatts?"warning":"";
-
-    document.getElementById("result2").style.display="block";
+ document.getElementById('result2').style.display='block';
 }
 
 function calculateBank(){
+ let v=+document.getElementById('batteryV').value;
+ let a=+document.getElementById('batteryAh').value;
+ let s=+document.getElementById('series').value;
+ let p=+document.getElementById('parallel').value;
 
-    const batteryV=Number(document.getElementById("batteryV").value);
-    const batteryAh=Number(document.getElementById("batteryAh").value);
-    const series=Number(document.getElementById("series").value);
-    const parallel=Number(document.getElementById("parallel").value);
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Please enter valid battery values.');
+  return;
+ }
 
-    if(![batteryV,batteryAh,series,parallel].every(Number.isFinite) ||
-       batteryV<=0 || batteryAh<=0 ||
-       !Number.isInteger(series) || !Number.isInteger(parallel) ||
-       series<1 || parallel<1){
-        alert("Please enter valid battery values.");
-        return;
-    }
+ let q=s*p;
+ let tv=v*s;
+ let ta=a*p;
 
-    const totalBattery=series*parallel;
-    const totalVoltage=batteryV*series;
-    const totalAh=batteryAh*parallel;
-    const totalKwh=(totalVoltage*totalAh)/1000;
+ document.getElementById('bankBattery').textContent=q+' Batteries';
+ document.getElementById('bankVoltage').textContent=
+ 'Total Battery Bank Voltage: '+tv+' VDC';
+ document.getElementById('bankAh').textContent=
+ 'Total Battery Bank Capacity: '+ta+' Ah';
+ document.getElementById('bankEnergy').textContent=
+ 'Nominal Battery Energy: '+(tv*ta/1000).toFixed(2)+' kWh';
 
-    document.getElementById("bankBattery").innerText=
-    totalBattery+" Batteries";
-
-    document.getElementById("bankVoltage").innerText=
-    "Total Battery Bank Voltage: "+totalVoltage+" VDC";
-
-    document.getElementById("bankAh").innerText=
-    "Total Battery Bank Capacity: "+totalAh+" Ah";
-
-    document.getElementById("bankEnergy").innerText=
-    "Nominal Battery Energy: "+totalKwh.toFixed(2)+" kWh";
-
-    document.getElementById("result3").style.display="block";
+ document.getElementById('result3').style.display='block';
 }
 
-</script>
+const defaults=[
+ ['Online UPS','As per required capacity and phase',1,'Set',0],
+ ['Battery','As per selected type and configuration',20,'Pcs',0],
+ ['Battery Rack','Floor / wall mounted battery rack',1,'Set',0],
+ ['DC Cable & Lugs','Battery interconnection cable and lugs',1,'Lot',0],
+ ['DC MCCB','DC rated breaker; final rating subject to engineering',1,'Pcs',0],
+ ['External Battery Charger','As per UPS / battery requirement',1,'Pcs',0],
+ ['Delivery & Transportation','Delivery to project site',1,'Lot',0],
+ ['Installation & Commissioning','Installation, testing and commissioning',1,'Lot',0],
+ ['Other Accessories','As required',1,'Lot',0]
+];
 
+function addRow(desc='',spec='',qty=1,unit='Lot',price=0){
+ let tr=document.createElement('tr');
+
+ tr.innerHTML=
+ '<td class="sl"></td>'+
+ '<td><input class="desc"></td>'+
+ '<td><input class="qty" type="number" min="0" step="any"></td>'+
+ '<td><input class="unit"></td>'+
+ '<td><input class="price" type="number" min="0" step="any"></td>'+
+ '<td class="rowtotal">৳0.00</td>'+
+ '<td class="no-print"><button type="button" class="remove">Remove</button></td>';
+
+ tr.querySelector('.desc').value=desc+(spec?' – '+spec:'');
+ tr.querySelector('.qty').value=qty;
+ tr.querySelector('.unit').value=unit;
+ tr.querySelector('.price').value=price;
+
+ tr.querySelector('.remove').addEventListener('click',function(){
+  tr.remove();
+  renumber();
+  updateTotals();
+ });
+
+ tr.querySelectorAll('input').forEach(function(x){
+  x.addEventListener('input',updateTotals);
+ });
+
+ document.getElementById('boqBody').appendChild(tr);
+ renumber();
+ updateTotals();
+}
+
+function renumber(){
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  r.querySelector('.sl').textContent=i+1;
+ });
+}
+
+function updateBatterySummary(){
+ let v=+document.getElementById('boqBatV').value;
+ let a=+document.getElementById('boqBatAh').value;
+ let s=+document.getElementById('boqSeries').value;
+ let p=+document.getElementById('boqParallel').value;
+
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Enter valid battery configuration.');
+  return;
+ }
+
+ let qty=s*p;
+ let bankV=s*v;
+ let bankAh=p*a;
+ let kwh=bankV*bankAh/1000;
+
+ document.getElementById('batterySummary').textContent=
+ 'Total batteries: '+qty+' pcs | Bank voltage: '+bankV+
+ ' VDC | Bank capacity: '+bankAh+' Ah | Nominal energy: '+
+ kwh.toFixed(2)+' kWh';
+
+ document.querySelectorAll('#boqBody tr').forEach(function(r){
+  if(r.querySelector('.desc').value.toLowerCase().startsWith('battery –')){
+   r.querySelector('.qty').value=qty;
+  }
+ });
+
+ updateTotals();
+}
+
+function money(n){
+ return '৳'+n.toLocaleString('en-BD',{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ });
+}
+
+function updateTotals(){
+ let sub=0;
+
+ [...document.getElementById('boqBody').rows].forEach(function(r){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+  let t=q*p;
+  sub+=t;
+  r.querySelector('.rowtotal').textContent=money(t);
+ });
+
+ let disc=Math.max(0,+document.getElementById('discount').value||0);
+ let base=Math.max(0,sub-disc);
+ let va=base*(Math.max(0,+document.getElementById('vat').value||0)/100);
+ let tx=base*(Math.max(0,+document.getElementById('tax').value||0)/100);
+ let oth=Math.max(0,+document.getElementById('other').value||0);
+
+ document.getElementById('subtotal').textContent=money(sub);
+ document.getElementById('vatAmount').textContent=money(va);
+ document.getElementById('taxAmount').textContent=money(tx);
+ document.getElementById('grandTotal').textContent=money(base+va+tx+oth);
+}
+
+function calcMccb(){
+ let v=+document.getElementById('mccbV').value;
+ let i=+document.getElementById('mccbI').value;
+ let m=+document.getElementById('mccbMargin').value;
+
+ if(![v,i,m].every(Number.isFinite)||v<=0||i<=0||m<0||m>100){
+  alert('Enter valid DC values.');
+  return;
+ }
+
+ document.getElementById('mccbAnswer').textContent=
+ (i*(1+m/100)).toFixed(2)+' A preliminary reference';
+
+ document.getElementById('mccbResult').style.display='block';
+}
+
+function exportCSV(){
+ let rows=[[
+  'SL','Description / Specification','Qty','Unit',
+  'Unit Price (BDT)','Total (BDT)'
+ ]];
+
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+
+  rows.push([
+   i+1,
+   r.querySelector('.desc').value,
+   q,
+   r.querySelector('.unit').value,
+   p,
+   q*p
+  ]);
+ });
+
+ rows.push(
+  [],
+  ['Customer',document.getElementById('customer').value],
+  ['Project',document.getElementById('project').value],
+  ['Subtotal',document.getElementById('subtotal').textContent],
+  ['Discount',document.getElementById('discount').value],
+  ['VAT %',document.getElementById('vat').value],
+  ['Tax %',document.getElementById('tax').value],
+  ['Other Charges',document.getElementById('other').value],
+  ['Grand Total',document.getElementById('grandTotal').textContent]
+ );
+
+ let csv=rows.map(function(r){
+  return r.map(function(x){
+   return '"'+String(x??'').replace(/"/g,'""')+'"';
+  }).join(',');
+ }).join('\r\n');
+
+ let blob=new Blob(['\ufeff'+csv],{
+  type:'text/csv;charset=utf-8;'function showSection(n){
+ for(let i=1;i<=4;i++){
+  document.getElementById('section'+i).classList.toggle('active',i===n);
+  document.getElementById('tab'+i).classList.toggle('active',i===n);
+ }
+}
+
+function setDoD(n){
+ document.getElementById('dod'+n).value=
+ document.getElementById('type'+n).value==='lead'?50:80;
+}
+
+function validBasic(k,p,l,v,e,d){
+ return [k,p,l,v,e,d].every(Number.isFinite)&&
+ k>0&&p>0&&p<=1&&l>0&&v>0&&e>0&&e<=100&&d>0&&d<=100;
+}
+
+function timeText(h){
+ let mins=Math.round(h*60);
+ return Math.floor(mins/60)+' Hours '+(mins%60)+' Minutes';
+}
+
+function backupCalculation(){
+ let k=+document.getElementById('kva1').value;
+ let p=+document.getElementById('pf1').value;
+ let l=+document.getElementById('load1').value;
+ let v=+document.getElementById('voltage1').value;
+ let a=+document.getElementById('ah1').value;
+ let s=+document.getElementById('strings1').value;
+ let e=+document.getElementById('eff1').value;
+ let d=+document.getElementById('dod1').value;
+
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(a)||a<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
+
+ let rated=k*1000*p;
+ let bankAh=a*s;
+ let usable=v*bankAh*d/100*e/100;
+ let h=usable/l;
+
+ document.getElementById('backupAnswer').textContent=timeText(h);
+ document.getElementById('backupDetails').textContent=
+ 'Phase: '+document.getElementById('phase1').value+
+ ' | Total Battery Bank: '+bankAh.toFixed(2)+
+ ' Ah | Usable Energy: '+usable.toFixed(0)+' Wh';
+
+ document.getElementById('backupStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
+
+ document.getElementById('backupStatus').className=
+ l>rated?'warning':'';
+
+ document.getElementById('result1').style.display='block';
+}
+
+function requiredAhCalculation(){
+ let k=+document.getElementById('kva2').value;
+ let p=+document.getElementById('pf2').value;
+ let l=+document.getElementById('load2').value;
+ let t=+document.getElementById('time2').value;
+ let v=+document.getElementById('voltage2').value;
+ let e=+document.getElementById('eff2').value;
+ let d=+document.getElementById('dod2').value;
+ let s=+document.getElementById('strings2').value;
+
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(t)||t<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
+
+ let rated=k*1000*p;
+ let bank=(l*t)/(v*e/100*d/100);
+
+ document.getElementById('requiredAnswer').textContent=
+ bank.toFixed(2)+' Ah';
+
+ document.getElementById('requiredDetails').textContent=
+ 'Phase: '+document.getElementById('phase2').value+
+ ' | Required capacity per parallel string: '+
+ (bank/s).toFixed(2)+' Ah';
+
+ document.getElementById('requiredStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
+
+ document.getElementById('requiredStatus').className=
+ l>rated?'warning':'';
+
+ document.getElementById('result2').style.display='block';
+}
+
+function calculateBank(){
+ let v=+document.getElementById('batteryV').value;
+ let a=+document.getElementById('batteryAh').value;
+ let s=+document.getElementById('series').value;
+ let p=+document.getElementById('parallel').value;
+
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Please enter valid battery values.');
+  return;
+ }
+
+ let q=s*p;
+ let tv=v*s;
+ let ta=a*p;
+
+ document.getElementById('bankBattery').textContent=q+' Batteries';
+ document.getElementById('bankVoltage').textContent=
+ 'Total Battery Bank Voltage: '+tv+' VDC';
+ document.getElementById('bankAh').textContent=
+ 'Total Battery Bank Capacity: '+ta+' Ah';
+ document.getElementById('bankEnergy').textContent=
+ 'Nominal Battery Energy: '+(tv*ta/1000).toFixed(2)+' kWh';
+
+ document.getElementById('result3').style.display='block';
+}
+
+const defaults=[
+ ['Online UPS','As per required capacity and phase',1,'Set',0],
+ ['Battery','As per selected type and configuration',20,'Pcs',0],
+ ['Battery Rack','Floor / wall mounted battery rack',1,'Set',0],
+ ['DC Cable & Lugs','Battery interconnection cable and lugs',1,'Lot',0],
+ ['DC MCCB','DC rated breaker; final rating subject to engineering',1,'Pcs',0],
+ ['External Battery Charger','As per UPS / battery requirement',1,'Pcs',0],
+ ['Delivery & Transportation','Delivery to project site',1,'Lot',0],
+ ['Installation & Commissioning','Installation, testing and commissioning',1,'Lot',0],
+ ['Other Accessories','As required',1,'Lot',0]
+];
+
+function addRow(desc='',spec='',qty=1,unit='Lot',price=0){
+ let tr=document.createElement('tr');
+
+ tr.innerHTML=
+ '<td class="sl"></td>'+
+ '<td><input class="desc"></td>'+
+ '<td><input class="qty" type="number" min="0" step="any"></td>'+
+ '<td><input class="unit"></td>'+
+ '<td><input class="price" type="number" min="0" step="any"></td>'+
+ '<td class="rowtotal">৳0.00</td>'+
+ '<td class="no-print"><button type="button" class="remove">Remove</button></td>';
+
+ tr.querySelector('.desc').value=desc+(spec?' – '+spec:'');
+ tr.querySelector('.qty').value=qty;
+ tr.querySelector('.unit').value=unit;
+ tr.querySelector('.price').value=price;
+
+ tr.querySelector('.remove').addEventListener('click',function(){
+  tr.remove();
+  renumber();
+  updateTotals();
+ });
+
+ tr.querySelectorAll('input').forEach(function(x){
+  x.addEventListener('input',updateTotals);
+ });
+
+ document.getElementById('boqBody').appendChild(tr);
+ renumber();
+ updateTotals();
+}
+
+function renumber(){
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  r.querySelector('.sl').textContent=i+1;
+ });
+}
+
+function updateBatterySummary(){
+ let v=+document.getElementById('boqBatV').value;
+ let a=+document.getElementById('boqBatAh').value;
+ let s=+document.getElementById('boqSeries').value;
+ let p=+document.getElementById('boqParallel').value;
+
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Enter valid battery configuration.');
+  return;
+ }
+
+ let qty=s*p;
+ let bankV=s*v;
+ let bankAh=p*a;
+ let kwh=bankV*bankAh/1000;
+
+ document.getElementById('batterySummary').textContent=
+ 'Total batteries: '+qty+' pcs | Bank voltage: '+bankV+
+ ' VDC | Bank capacity: '+bankAh+' Ah | Nominal energy: '+
+ kwh.toFixed(2)+' kWh';
+
+ document.querySelectorAll('#boqBody tr').forEach(function(r){
+  if(r.querySelector('.desc').value.toLowerCase().startsWith('battery –')){
+   r.querySelector('.qty').value=qty;
+  }
+ });
+
+ updateTotals();
+}
+
+function money(n){
+ return '৳'+n.toLocaleString('en-BD',{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ });
+}
+
+function updateTotals(){
+ let sub=0;
+
+ [...document.getElementById('boqBody').rows].forEach(function(r){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+  let t=q*p;
+  sub+=t;
+  r.querySelector('.rowtotal').textContent=money(t);
+ });
+
+ let disc=Math.max(0,+document.getElementById('discount').value||0);
+ let base=Math.max(0,sub-disc);
+ let va=base*(Math.max(0,+document.getElementById('vat').value||0)/100);
+ let tx=base*(Math.max(0,+document.getElementById('tax').value||0)/100);
+ let oth=Math.max(0,+document.getElementById('other').value||0);
+
+ document.getElementById('subtotal').textContent=money(sub);
+ document.getElementById('vatAmount').textContent=money(va);
+ document.getElementById('taxAmount').textContent=money(tx);
+ document.getElementById('grandTotal').textContent=money(base+va+tx+oth);
+}
+
+function calcMccb(){
+ let v=+document.getElementById('mccbV').value;
+ let i=+document.getElementById('mccbI').value;
+ let m=+document.getElementById('mccbMargin').value;
+
+ if(![v,i,m].every(Number.isFinite)||v<=0||i<=0||m<0||m>100){
+  alert('Enter valid DC values.');
+  return;
+ }
+
+ document.getElementById('mccbAnswer').textContent=
+ (i*(1+m/100)).toFixed(2)+' A preliminary reference';
+
+ document.getElementById('mccbResult').style.display='block';
+}
+
+function exportCSV(){
+ let rows=[[
+  'SL','Description / Specification','Qty','Unit',
+  'Unit Price (BDT)','Total (BDT)'
+ ]];
+
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+
+  rows.push([
+   i+1,
+   r.querySelector('.desc').value,
+   q,
+   r.querySelector('.unit').value,
+   p,
+   q*p
+  ]);
+ });
+
+ rows.push(
+  [],
+  ['Customer',document.getElementById('customer').value],
+  ['Project',document.getElementById('project').value],
+  ['Subtotal',document.getElementById('subtotal').textContent],
+  ['Discount',document.getElementById('discount').value],
+  ['VAT %',document.getElementById('vat').value],
+  ['Tax %',document.getElementById('tax').value],
+  ['Other Charges',document.getElementById('other').value],
+  ['Grand Total',document.getElementById('grandTotal').textContent]
+ );
+
+ let csv=rows.map(function(r){
+  return r.map(function(x){
+   return '"'+String(x??'').replace(/"/g,'""')+'"';
+  }).join(',');
+ }).join('\r\n');
+
+ let blob=new Blob(['\ufeff'+csv],{
+  type:'text/csv;charset=utf-8;'
+ });
+
+ let url=URL.createObjectURL(blob);
+ let a=document.createElement('a');
+ a.href=url;
+ a.download='UPS-BOQ.csv';
+ a.click();function showSection(n){
+ for(let i=1;i<=4;i++){
+  document.getElementById('section'+i).classList.toggle('active',i===n);
+  document.getElementById('tab'+i).classList.toggle('active',i===n);
+ }
+}
+
+function setDoD(n){
+ document.getElementById('dod'+n).value=
+ document.getElementById('type'+n).value==='lead'?50:80;
+}
+
+function validBasic(k,p,l,v,e,d){
+ return [k,p,l,v,e,d].every(Number.isFinite)&&
+ k>0&&p>0&&p<=1&&l>0&&v>0&&e>0&&e<=100&&d>0&&d<=100;
+}
+
+function timeText(h){
+ let mins=Math.round(h*60);
+ return Math.floor(mins/60)+' Hours '+(mins%60)+' Minutes';
+}
+
+function backupCalculation(){
+ let k=+document.getElementById('kva1').value;
+ let p=+document.getElementById('pf1').value;
+ let l=+document.getElementById('load1').value;
+ let v=+document.getElementById('voltage1').value;
+ let a=+document.getElementById('ah1').value;
+ let s=+document.getElementById('strings1').value;
+ let e=+document.getElementById('eff1').value;
+ let d=+document.getElementById('dod1').value;
+
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(a)||a<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
+
+ let rated=k*1000*p;
+ let bankAh=a*s;
+ let usable=v*bankAh*d/100*e/100;
+ let h=usable/l;
+
+ document.getElementById('backupAnswer').textContent=timeText(h);
+ document.getElementById('backupDetails').textContent=
+ 'Phase: '+document.getElementById('phase1').value+
+ ' | Total Battery Bank: '+bankAh.toFixed(2)+
+ ' Ah | Usable Energy: '+usable.toFixed(0)+' Wh';
+
+ document.getElementById('backupStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
+
+ document.getElementById('backupStatus').className=
+ l>rated?'warning':'';
+
+ document.getElementById('result1').style.display='block';
+}
+
+function requiredAhCalculation(){
+ let k=+document.getElementById('kva2').value;
+ let p=+document.getElementById('pf2').value;
+ let l=+document.getElementById('load2').value;
+ let t=+document.getElementById('time2').value;
+ let v=+document.getElementById('voltage2').value;
+ let e=+document.getElementById('eff2').value;
+ let d=+document.getElementById('dod2').value;
+ let s=+document.getElementById('strings2').value;
+
+ if(!validBasic(k,p,l,v,e,d)||!Number.isFinite(t)||t<=0||
+ !Number.isInteger(s)||s<1){
+  alert('Please enter valid values.');
+  return;
+ }
+
+ let rated=k*1000*p;
+ let bank=(l*t)/(v*e/100*d/100);
+
+ document.getElementById('requiredAnswer').textContent=
+ bank.toFixed(2)+' Ah';
+
+ document.getElementById('requiredDetails').textContent=
+ 'Phase: '+document.getElementById('phase2').value+
+ ' | Required capacity per parallel string: '+
+ (bank/s).toFixed(2)+' Ah';
+
+ document.getElementById('requiredStatus').textContent=
+ l>rated?'Warning: Load exceeds UPS rated watt capacity.':
+ 'Load is within UPS rated watt capacity.';
+
+ document.getElementById('requiredStatus').className=
+ l>rated?'warning':'';
+
+ document.getElementById('result2').style.display='block';
+}
+
+function calculateBank(){
+ let v=+document.getElementById('batteryV').value;
+ let a=+document.getElementById('batteryAh').value;
+ let s=+document.getElementById('series').value;
+ let p=+document.getElementById('parallel').value;
+
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Please enter valid battery values.');
+  return;
+ }
+
+ let q=s*p;
+ let tv=v*s;
+ let ta=a*p;
+
+ document.getElementById('bankBattery').textContent=q+' Batteries';
+ document.getElementById('bankVoltage').textContent=
+ 'Total Battery Bank Voltage: '+tv+' VDC';
+ document.getElementById('bankAh').textContent=
+ 'Total Battery Bank Capacity: '+ta+' Ah';
+ document.getElementById('bankEnergy').textContent=
+ 'Nominal Battery Energy: '+(tv*ta/1000).toFixed(2)+' kWh';
+
+ document.getElementById('result3').style.display='block';
+}
+
+const defaults=[
+ ['Online UPS','As per required capacity and phase',1,'Set',0],
+ ['Battery','As per selected type and configuration',20,'Pcs',0],
+ ['Battery Rack','Floor / wall mounted battery rack',1,'Set',0],
+ ['DC Cable & Lugs','Battery interconnection cable and lugs',1,'Lot',0],
+ ['DC MCCB','DC rated breaker; final rating subject to engineering',1,'Pcs',0],
+ ['External Battery Charger','As per UPS / battery requirement',1,'Pcs',0],
+ ['Delivery & Transportation','Delivery to project site',1,'Lot',0],
+ ['Installation & Commissioning','Installation, testing and commissioning',1,'Lot',0],
+ ['Other Accessories','As required',1,'Lot',0]
+];
+
+function addRow(desc='',spec='',qty=1,unit='Lot',price=0){
+ let tr=document.createElement('tr');
+
+ tr.innerHTML=
+ '<td class="sl"></td>'+
+ '<td><input class="desc"></td>'+
+ '<td><input class="qty" type="number" min="0" step="any"></td>'+
+ '<td><input class="unit"></td>'+
+ '<td><input class="price" type="number" min="0" step="any"></td>'+
+ '<td class="rowtotal">৳0.00</td>'+
+ '<td class="no-print"><button type="button" class="remove">Remove</button></td>';
+
+ tr.querySelector('.desc').value=desc+(spec?' – '+spec:'');
+ tr.querySelector('.qty').value=qty;
+ tr.querySelector('.unit').value=unit;
+ tr.querySelector('.price').value=price;
+
+ tr.querySelector('.remove').addEventListener('click',function(){
+  tr.remove();
+  renumber();
+  updateTotals();
+ });
+
+ tr.querySelectorAll('input').forEach(function(x){
+  x.addEventListener('input',updateTotals);
+ });
+
+ document.getElementById('boqBody').appendChild(tr);
+ renumber();
+ updateTotals();
+}
+
+function renumber(){
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  r.querySelector('.sl').textContent=i+1;
+ });
+}
+
+function updateBatterySummary(){
+ let v=+document.getElementById('boqBatV').value;
+ let a=+document.getElementById('boqBatAh').value;
+ let s=+document.getElementById('boqSeries').value;
+ let p=+document.getElementById('boqParallel').value;
+
+ if(![v,a,s,p].every(Number.isFinite)||v<=0||a<=0||
+ !Number.isInteger(s)||!Number.isInteger(p)||s<1||p<1){
+  alert('Enter valid battery configuration.');
+  return;
+ }
+
+ let qty=s*p;
+ let bankV=s*v;
+ let bankAh=p*a;
+ let kwh=bankV*bankAh/1000;
+
+ document.getElementById('batterySummary').textContent=
+ 'Total batteries: '+qty+' pcs | Bank voltage: '+bankV+
+ ' VDC | Bank capacity: '+bankAh+' Ah | Nominal energy: '+
+ kwh.toFixed(2)+' kWh';
+
+ document.querySelectorAll('#boqBody tr').forEach(function(r){
+  if(r.querySelector('.desc').value.toLowerCase().startsWith('battery –')){
+   r.querySelector('.qty').value=qty;
+  }
+ });
+
+ updateTotals();
+}
+
+function money(n){
+ return '৳'+n.toLocaleString('en-BD',{
+  minimumFractionDigits:2,
+  maximumFractionDigits:2
+ });
+}
+
+function updateTotals(){
+ let sub=0;
+
+ [...document.getElementById('boqBody').rows].forEach(function(r){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+  let t=q*p;
+  sub+=t;
+  r.querySelector('.rowtotal').textContent=money(t);
+ });
+
+ let disc=Math.max(0,+document.getElementById('discount').value||0);
+ let base=Math.max(0,sub-disc);
+ let va=base*(Math.max(0,+document.getElementById('vat').value||0)/100);
+ let tx=base*(Math.max(0,+document.getElementById('tax').value||0)/100);
+ let oth=Math.max(0,+document.getElementById('other').value||0);
+
+ document.getElementById('subtotal').textContent=money(sub);
+ document.getElementById('vatAmount').textContent=money(va);
+ document.getElementById('taxAmount').textContent=money(tx);
+ document.getElementById('grandTotal').textContent=money(base+va+tx+oth);
+}
+
+function calcMccb(){
+ let v=+document.getElementById('mccbV').value;
+ let i=+document.getElementById('mccbI').value;
+ let m=+document.getElementById('mccbMargin').value;
+
+ if(![v,i,m].every(Number.isFinite)||v<=0||i<=0||m<0||m>100){
+  alert('Enter valid DC values.');
+  return;
+ }
+
+ document.getElementById('mccbAnswer').textContent=
+ (i*(1+m/100)).toFixed(2)+' A preliminary reference';
+
+ document.getElementById('mccbResult').style.display='block';
+}
+
+function exportCSV(){
+ let rows=[[
+  'SL','Description / Specification','Qty','Unit',
+  'Unit Price (BDT)','Total (BDT)'
+ ]];
+
+ [...document.getElementById('boqBody').rows].forEach(function(r,i){
+  let q=+r.querySelector('.qty').value||0;
+  let p=+r.querySelector('.price').value||0;
+
+  rows.push([
+   i+1,
+   r.querySelector('.desc').value,
+   q,
+   r.querySelector('.unit').value,
+   p,
+   q*p
+  ]);
+ });
+
+ rows.push(
+  [],
+  ['Customer',document.getElementById('customer').value],
+  ['Project',document.getElementById('project').value],
+  ['Subtotal',document.getElementById('subtotal').textContent],
+  ['Discount',document.getElementById('discount').value],
+  ['VAT %',document.getElementById('vat').value],
+  ['Tax %',document.getElementById('tax').value],
+  ['Other Charges',document.getElementById('other').value],
+  ['Grand Total',document.getElementById('grandTotal').textContent]
+ );
+
+ let csv=rows.map(function(r){
+  return r.map(function(x){
+   return '"'+String(x??'').replace(/"/g,'""')+'"';
+  }).join(',');
+ }).join('\r\n');
+
+ let blob=new Blob(['\ufeff'+csv],{
+  type:'text/csv;charset=utf-8;'
+ });
+
+ let url=URL.createObjectURL(blob);
+ let a=document.createElement('a');
+ a.href=url;
+ a.download='UPS-BOQ.csv';
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+defaults.forEach(function(x){
+ addRow(...x);
+});
+</script>
+</body>
+</html>
+ URL.revokeObjectURL(url);
+}
+
+defaults.forEach(function(x){
+ addRow(...x);
+});
+</script>
+</body>
+</html>
+ });
+
+ let url=URL.createObjectURL(blob);
+ let a=document.createElement('a');
+ a.href=url;
+ a.download='UPS-BOQ.csv';
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+defaults.forEach(function(x){
+ addRow(...x);
+});
+</script>
 </body>
 </html>
